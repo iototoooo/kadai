@@ -1,0 +1,12 @@
+# 認証情報
+service_account.json
+*.json.key
+token.json
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+
+# その他ローカルファイル
+*.xlsx
