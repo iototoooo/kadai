@@ -1,19 +1,34 @@
 import mimetypes
 import os
 
-from google.oauth2.service_account import Credentials
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-SERVICE_ACCOUNT_FILE = "service_account.json"
+CREDENTIALS_FILE = "credentials.json"
+TOKEN_FILE = "token.json"
 
-# 共有フォルダにアップロードする場合はフォルダIDを指定（空文字ならサービスアカウントのDrive直下）
-FOLDER_ID = ""
+# アップロード先フォルダID（空文字なら自分のDrive直下）
+FOLDER_ID = "1SBKgN20BhgPd0oFEba76i8U-fj1jemKF"
 
 
 def get_drive_service():
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    creds = None
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_FILE, "w", encoding="utf-8") as token:
+            token.write(creds.to_json())
+
     return build("drive", "v3", credentials=creds)
 
 
