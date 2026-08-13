@@ -2,6 +2,7 @@
 service_account.json
 *.json.key
 token.json
+token_meet.json
 credentials.json
 
 # Python
