@@ -4,6 +4,7 @@ service_account.json
 token.json
 token_meet.json
 credentials.json
+.env
 
 # Python
 __pycache__/
