@@ -13,3 +13,4 @@ __pycache__/
 
 # その他ローカルファイル
 *.xlsx
+youtube_notify_state/
