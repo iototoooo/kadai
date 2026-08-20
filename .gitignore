@@ -13,4 +13,6 @@ __pycache__/
 
 # その他ローカルファイル
 *.xlsx
+*.pptx
 youtube_notify_state/
+youtube_notify_state_discord/
