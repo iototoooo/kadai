@@ -4,6 +4,7 @@ service_account.json
 token.json
 token_meet.json
 token_gmail.json
+token_youtube_upload.json
 credentials.json
 .env
 
