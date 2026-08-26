@@ -62,16 +62,37 @@ def create_meeting(topic: str, start_time: str, duration_minutes: int, user_id: 
     return response.json()
 
 
+def prompt_start_time() -> str | None:
+    """開催日と開始時刻を分けて入力し、Zoom API用のstart_time文字列を組み立てる
+
+    開催日は YYYY-MM-DD（空欄で本日）、開始時刻は HH:MM（空欄で現在時刻、秒は00固定）で入力する
+    """
+    now = datetime.now()
+
+    date_input = input("開催日 YYYY-MM-DD（空欄で本日）: ").strip()
+    date_str = date_input or now.strftime("%Y-%m-%d")
+
+    time_input = input("開始時刻 HH:MM（空欄で現在時刻）: ").strip()
+    time_str = time_input or now.strftime("%H:%M")
+
+    try:
+        start_time = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        print("開催日または開始時刻の形式が正しくありません（例: 2026-08-20 / 14:30）")
+        return None
+
+    return start_time.strftime("%Y-%m-%dT%H:%M:00")
+
+
 def main():
     print("Zoom ミーティング作成")
     print("-" * 40)
 
     topic = input("会議名: ").strip() or "新しい会議"
 
-    start_time_input = input(
-        "開始日時 YYYY-MM-DDTHH:MM:SS（空欄で現在時刻）: "
-    ).strip()
-    start_time = start_time_input or datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    start_time = prompt_start_time()
+    if start_time is None:
+        return
 
     duration_input = input("所要時間（分、空欄で60分）: ").strip()
     duration_minutes = int(duration_input) if duration_input else 60

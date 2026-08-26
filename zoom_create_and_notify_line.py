@@ -1,10 +1,8 @@
-from datetime import datetime
-
 import requests
 from dotenv import load_dotenv
 
 from line_send_message import push_message
-from zoom_create_meeting import create_meeting
+from zoom_create_meeting import create_meeting, prompt_start_time
 
 # zoom_create_meeting.py の認証設定（ZOOM_ACCOUNT_ID 等）と
 # line_send_message.py の認証設定（LINE_CHANNEL_ACCESS_TOKEN）が両方必要
@@ -53,10 +51,9 @@ def main():
 
     topic = input("会議名: ").strip() or "新しい会議"
 
-    start_time_input = input(
-        "開始日時 YYYY-MM-DDTHH:MM:SS（空欄で現在時刻）: "
-    ).strip()
-    start_time = start_time_input or datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    start_time = prompt_start_time()
+    if start_time is None:
+        return
 
     duration_input = input("所要時間（分、空欄で60分）: ").strip()
     duration_minutes = int(duration_input) if duration_input else 60

@@ -17,3 +17,4 @@ __pycache__/
 *.pptx
 youtube_notify_state/
 youtube_notify_state_discord/
+zoom_reminder_state.json
