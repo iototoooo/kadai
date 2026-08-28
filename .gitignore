@@ -18,3 +18,4 @@ __pycache__/
 youtube_notify_state/
 youtube_notify_state_discord/
 zoom_reminder_state.json
+slack_notify_state.json
