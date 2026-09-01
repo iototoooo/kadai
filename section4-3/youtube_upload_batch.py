@@ -18,8 +18,9 @@ from googleapiclient.http import MediaFileUpload
 # なお videos.insert は1回あたり約1600ユニット消費するため、デフォルトの1日10,000ユニット枠では
 # 1日に数本程度が上限の目安。
 SCOPES = ["https://www.googleapis.com/auth/youtube"]
-CREDENTIALS_FILE = "credentials.json"
-TOKEN_FILE = "token_youtube_upload.json"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = os.path.join(SCRIPT_DIR, "credentials.json")
+TOKEN_FILE = os.path.join(SCRIPT_DIR, "token_youtube_upload.json")
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".wmv", ".flv", ".mkv", ".webm", ".m4v"}
 
