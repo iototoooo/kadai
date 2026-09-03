@@ -5,6 +5,7 @@ token.json
 token_meet.json
 token_gmail.json
 token_youtube_upload.json
+token_meet_minutes.json
 credentials.json
 .env
 mercari_storage_state.json
@@ -20,3 +21,4 @@ youtube_notify_state/
 youtube_notify_state_discord/
 zoom_reminder_state.json
 slack_notify_state.json
+transcript_*.txt
