@@ -5,8 +5,12 @@ Google Meet の録画(Google Drive 上)から議事録を自動生成し、Googl
   1. Google Drive から録画ファイルをダウンロード
      (--file-id で直接指定、または --folder-id でフォルダ内の最新の動画/音声を自動選択)
   2. 同梱の ffmpeg(imageio-ffmpeg)で音声だけを 16kHz モノラルに圧縮
-  3. OpenAI Whisper API で文字起こし(日本語)
-     - 圧縮後でも 25MB を超える場合は時間で分割して逐次文字起こしし、結果を連結する
+     - 先頭と末尾の無音を除去する(--no-trim-silence で無効化)。録音末尾の無音・雑音で
+       文字起こしモデルが同じ語を繰り返す暴走を防ぐため(会話中の間は残す)
+  3. OpenAI の文字起こしモデルで文字起こし(日本語)
+     - 25MB を超える、またはモデルの音声長上限(gpt-4o-transcribe は約1400秒)を
+       超える場合は時間で分割して逐次文字起こしし、結果を連結する
+     - 連続して繰り返される語句(モデルの暴走)は1回に圧縮する
   4. (任意) --chat-file-id で指定した Drive 上のチャットログ(テキスト/Google ドキュメント)を読み込む
   5. OpenAI Chat API で社内共有用の議事録に要約
   6. Google ドキュメントを新規作成し、「議事録 + 参考:全文文字起こし」を1つの文書に書き込む
@@ -26,7 +30,9 @@ Google Meet の録画(Google Drive 上)から議事録を自動生成し、Googl
     リポジトリ直下の .env に以下を設定しておくこと:
       OPENAI_API_KEY            (必須)
       OPENAI_MODEL             (任意、要約用。未設定なら gpt-4o-mini)
-      OPENAI_TRANSCRIBE_MODEL  (任意、文字起こし用。未設定なら whisper-1)
+      OPENAI_TRANSCRIBE_MODEL  (任意、文字起こし用。未設定なら whisper-1。
+                                gpt-4o-transcribe 系は長い音声で出力が途中で
+                                切れることがあるため既定にしていない)
       MEET_MINUTES_FOLDER_ID   (任意、議事録の保存先 Drive フォルダ ID。未設定ならマイドライブ直下)
 
 実行例:
@@ -88,10 +94,22 @@ MEET_MINUTES_FOLDER_ID = os.environ.get("MEET_MINUTES_FOLDER_ID", "")
 
 JST = ZoneInfo("Asia/Tokyo")
 
-# Whisper API のアップロード上限は 25MB。余裕を持たせてこのサイズで分割判定する。
+# 文字起こし API のアップロード上限は 25MB。余裕を持たせてこのサイズで分割判定する。
 MAX_AUDIO_BYTES = 24 * 1024 * 1024
-# 分割時の1チャンクの長さ(秒)。16kHz/モノラル/AAC 32kbps なら 20分で約5MB。
+# gpt-4o-transcribe 系は音声長 1400 秒が上限。余裕を持たせて超過分は分割する
+# (whisper-1 には長さ上限は無いが、分割しても問題はない)。
+MAX_AUDIO_SECONDS = 1350
+# 分割時の1チャンクの長さ(秒)。上限 1350 秒に収まるようにする。
 SEGMENT_SECONDS = 20 * 60
+# 無音除去フィルタ: 音声の「先頭と末尾」の無音だけを落とす(会話中の間は残す)。
+# 録音末尾の無音・雑音で文字起こしモデルが暴走するのを防ぐのが目的。
+# areverse で前後を反転させ、両端に同じ start トリムを適用する定番の書き方。
+SILENCE_FILTER = (
+    "silenceremove=start_periods=1:start_duration=0:start_threshold=-40dB,"
+    "areverse,"
+    "silenceremove=start_periods=1:start_duration=0:start_threshold=-40dB,"
+    "areverse"
+)
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -112,7 +130,8 @@ MINUTES_SYSTEM_PROMPT = """あなたは日本語の議事録作成アシスタ�
 - 議題ごとに要点をまとめる
 ## 決定事項
 ## ネクストアクション
-- 「担当者 / 期限 / タスク内容」の形式。担当や期限が不明なら (未定) と書く
+- 1アクションを1行で「- 担当: <氏名または(未定)> ／ 期限: <期日または(未定)> ／ 内容: <タスク>」の形式で書く
+- アクションが無ければ「- (記載なし)」の1行のみにする
 ## 保留・懸念事項
 ## 次回に向けて
 """
@@ -224,26 +243,42 @@ def _ffmpeg() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def extract_audio(src_path: str, dst_path: str) -> None:
-    """録画から音声のみを取り出し、16kHz モノラル AAC(32kbps)に圧縮する。"""
-    cmd = [
-        _ffmpeg(), "-y", "-i", src_path,
-        "-vn", "-ac", "1", "-ar", "16000",
-        "-c:a", "aac", "-b:a", "32k",
-        dst_path,
-    ]
+def extract_audio(src_path: str, dst_path: str, trim_silence: bool = True) -> None:
+    """録画から音声のみを取り出し、16kHz モノラル AAC(32kbps)に圧縮する。
+
+    trim_silence=True のときは長い無音区間を除去する。録音末尾の無音や雑音で
+    文字起こしモデルが同じ語を延々と繰り返す暴走を防ぐため。
+    """
+    cmd = [_ffmpeg(), "-y", "-i", src_path, "-vn", "-ac", "1", "-ar", "16000"]
+    if trim_silence:
+        cmd += ["-af", SILENCE_FILTER]
+    cmd += ["-c:a", "aac", "-b:a", "32k", dst_path]
+
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 or not os.path.exists(dst_path):
         raise RuntimeError(f"音声の抽出に失敗しました:\n{proc.stderr[-2000:]}")
 
 
+def get_audio_duration(path: str) -> float | None:
+    """ffmpeg の出力から音声の長さ(秒)を取得する。取れなければ None。"""
+    proc = subprocess.run(
+        [_ffmpeg(), "-i", path], capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
+    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", proc.stderr or "")
+    if not m:
+        return None
+    h, mm, ss = m.groups()
+    return int(h) * 3600 + int(mm) * 60 + float(ss)
+
+
 def split_audio(src_path: str, out_dir: str) -> list[str]:
-    """音声を SEGMENT_SECONDS 秒ごとのチャンクに分割する(再エンコードなし)。"""
+    """音声を SEGMENT_SECONDS 秒ごとのチャンクに分割する(念のため再エンコードする)。"""
     pattern = os.path.join(out_dir, "chunk_%03d.m4a")
     cmd = [
         _ffmpeg(), "-y", "-i", src_path,
         "-f", "segment", "-segment_time", str(SEGMENT_SECONDS),
-        "-reset_timestamps", "1", "-c", "copy",
+        "-reset_timestamps", "1", "-ac", "1", "-ar", "16000",
+        "-c:a", "aac", "-b:a", "32k",
         pattern,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -260,6 +295,19 @@ def split_audio(src_path: str, out_dir: str) -> list[str]:
     return chunks
 
 
+def _collapse_repeats(text: str) -> str:
+    """連続して繰り返される語句を1回に圧縮する(文字起こしモデルの暴走対策)。
+
+    「断 断 断 断 ...」「血がね 血がね ...」のように、同じ短い並びが3回以上
+    連続する箇所を1回だけに減らす。正当な「はい はい はい」等もまれに縮むが、
+    議事録用途では影響は小さい。
+    """
+    collapsed = re.sub(r"(.{1,40}?)(?:[ 　\n]*\1){2,}", r"\1", text)
+    # 1文字の連続(句読点や記号を除く)も畳む
+    collapsed = re.sub(r"([^\s\W])(?:[ 　]*\1){3,}", r"\1", collapsed)
+    return collapsed
+
+
 def transcribe_file(path: str) -> str:
     with open(path, "rb") as f:
         result = openai_client.audio.transcriptions.create(
@@ -274,11 +322,18 @@ def transcribe_file(path: str) -> str:
 
 def transcribe_audio(audio_path: str, work_dir: str) -> str:
     size = os.path.getsize(audio_path)
-    if size <= MAX_AUDIO_BYTES:
-        print(f"  文字起こし中(1ファイル, {size / 1024 / 1024:.1f}MB)...")
-        return transcribe_file(audio_path).strip()
+    # 音声長の上限があるのは gpt-4o-transcribe 系のみ。whisper-1 は長さ無制限なので
+    # 25MB 以内なら分割せず1回で処理する(分割の継ぎ目を作らない)。
+    has_duration_limit = OPENAI_TRANSCRIBE_MODEL.startswith("gpt-4o")
+    duration = get_audio_duration(audio_path) if has_duration_limit else None
+    too_long = duration is not None and duration > MAX_AUDIO_SECONDS
 
-    print(f"  音声が大きいため分割します({size / 1024 / 1024:.1f}MB)...")
+    if size <= MAX_AUDIO_BYTES and not too_long:
+        print(f"  文字起こし中(1ファイル, {size / 1024 / 1024:.1f}MB)...")
+        return _collapse_repeats(transcribe_file(audio_path).strip())
+
+    reason = "サイズ超過" if size > MAX_AUDIO_BYTES else f"長さ超過({duration:.0f}秒)"
+    print(f"  {reason}のため分割します({size / 1024 / 1024:.1f}MB)...")
     chunk_dir = os.path.join(work_dir, "chunks")
     os.makedirs(chunk_dir, exist_ok=True)
     chunks = split_audio(audio_path, chunk_dir)
@@ -293,7 +348,7 @@ def transcribe_audio(audio_path: str, work_dir: str) -> str:
                 "meet_minutes.py の SEGMENT_SECONDS を小さくして再実行してください。"
             )
         texts.append(transcribe_file(chunk).strip())
-    return "\n".join(t for t in texts if t).strip()
+    return _collapse_repeats("\n".join(t for t in texts if t).strip())
 
 
 def summarize_to_minutes(transcript: str, chat_log: str, meeting_title: str) -> str:
@@ -441,6 +496,11 @@ def main():
         help="文字起こしまで実行してファイルに保存し、要約・ドキュメント作成は行わない",
     )
     parser.add_argument(
+        "--no-trim-silence",
+        action="store_true",
+        help="音声の無音除去を行わない(既定は無音を除去して文字起こしの暴走を防ぐ)",
+    )
+    parser.add_argument(
         "--keep-audio", action="store_true", help="一時的な音声ファイルを削除せず残す"
     )
     args = parser.parse_args()
@@ -458,6 +518,7 @@ def main():
         with open(args.from_transcript, encoding="utf-8") as f:
             transcript = f.read().strip()
         meeting_title = args.meeting_title or _title_from_path(args.from_transcript)
+        transcript_path = args.from_transcript
         print(f"文字起こしファイルを読み込みました: {args.from_transcript}")
     else:
         drive, docs = get_services()
@@ -480,7 +541,7 @@ def main():
 
             audio_path = os.path.join(work_dir, "audio.m4a")
             print("音声を抽出・圧縮しています...")
-            extract_audio(src_path, audio_path)
+            extract_audio(src_path, audio_path, trim_silence=not args.no_trim_silence)
 
             transcript = transcribe_audio(audio_path, work_dir)
         finally:
@@ -493,8 +554,8 @@ def main():
             print("文字起こし結果が空でした。処理を中止します。")
             return
 
-    transcript_path = _save_transcript(meeting_title, transcript)
-    print(f"文字起こしを保存しました: {transcript_path}")
+        transcript_path = _save_transcript(meeting_title, transcript)
+        print(f"文字起こしを保存しました: {transcript_path}")
 
     if args.transcript_only:
         print("--transcript-only のためここで終了します。")
