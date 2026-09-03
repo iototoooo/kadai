@@ -12,8 +12,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/meetings.space.created",
     "https://www.googleapis.com/auth/meetings.space.readonly",
 ]
-CREDENTIALS_FILE = "credentials.json"
-TOKEN_FILE = "token_meet.json"  # Meet専用スコープのため他スクリプトのtoken.jsonとは分離
+# カレントディレクトリに依存しないよう、スクリプトと同じ場所を基準に解決する
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = os.path.join(SCRIPT_DIR, "credentials.json")
+TOKEN_FILE = os.path.join(SCRIPT_DIR, "token_meet.json")  # Meet専用スコープのため他スクリプトのtoken.jsonとは分離
 
 
 def get_meet_service():
