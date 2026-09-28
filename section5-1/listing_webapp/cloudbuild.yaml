@@ -1,0 +1,41 @@
+# NEXT_PUBLIC_FIREBASE_* をDockerの --build-arg として確実に渡すための明示的なビルド構成。
+# `gcloud run deploy --source` の --set-build-env-vars はDockerfileビルドには
+# 効かないことが確認できたため、この構成を使う(詳細は会話履歴の検証結果を参照)。
+#
+# ステップ2(verify-embedded-values)は、イメージ内の実際の静的ファイルを検査し、
+# NEXT_PUBLIC_FIREBASE_API_KEY の値が埋め込まれていなければビルド自体を失敗させる
+# 自動検証ゲート。Cloud Runへのデプロイは行わず、ビルド・検証のみ。
+steps:
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_IMAGE}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_API_KEY=${_NEXT_PUBLIC_FIREBASE_API_KEY}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=${_NEXT_PUBLIC_FIREBASE_PROJECT_ID}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_APP_ID=${_NEXT_PUBLIC_FIREBASE_APP_ID}'
+      - '.'
+
+  - id: verify-embedded-values
+    name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "=== .next/static 内にNEXT_PUBLIC_FIREBASE_API_KEYの値が埋め込まれているか検証 ==="
+        docker run --rm --entrypoint sh '${_IMAGE}' -c \
+          "grep -rl '${_NEXT_PUBLIC_FIREBASE_API_KEY}' /app/.next/static/ || exit 1"
+        echo "=== 検証OK: 値が正しく埋め込まれています ==="
+
+images:
+  - '${_IMAGE}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

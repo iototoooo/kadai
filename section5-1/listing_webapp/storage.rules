@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// 商品写真もブラウザから直接アクセスしない設計(アップロード・配信ともサーバー側API経由)。
+// Admin SDKはこれらのルールを経由しないため、フェイルセーフとしてクライアントSDKからの
+// アクセスを全面的に禁止する。
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
