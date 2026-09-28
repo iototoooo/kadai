@@ -189,7 +189,13 @@ def select_newest_first_sort(page) -> None:
 def collect_listing_items(page, today: datetime.date) -> list:
     """出品を「出品の新しい順」に並べ、「もっと見る」を最後まで押して全商品を集める。"""
     page.goto(LISTINGS_URL, wait_until="load")
-    page.wait_for_timeout(2000)
+    # 固定時間の待機だとメルカリ側の描画が遅い日に間に合わず、並び替えボタンや
+    # 商品カードが「見つからない」まま処理が進んでしまうため、商品カードが
+    # 実際に描画されるまで待つ(表示が遅いだけで0件ではないケースに対応)。
+    try:
+        page.wait_for_selector('a[data-testid="listed-item"]', timeout=15_000)
+    except Exception:
+        print("出品カードの表示待ちがタイムアウトしました(0件、または表示に失敗した可能性があります)。")
 
     select_newest_first_sort(page)
 
