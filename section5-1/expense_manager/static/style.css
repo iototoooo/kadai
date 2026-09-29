@@ -1,0 +1,187 @@
+:root {
+  color-scheme: light;
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --text: #1c1b1a;
+  --text-muted: #6b6863;
+  --border: #e5e2dc;
+  --accent: #2f6f4f;
+  --accent-contrast: #ffffff;
+  --danger: #b3261e;
+  --warning-bg: #fff4e0;
+  --warning-border: #e8b34d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #171614;
+    --surface: #232220;
+    --text: #f3f1ed;
+    --text-muted: #a8a49c;
+    --border: #38352f;
+    --accent: #5fbf8f;
+    --accent-contrast: #0e1a14;
+    --danger: #ff6b60;
+    --warning-bg: #3a2c12;
+    --warning-border: #a97a2b;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.page { max-width: 640px; margin: 0 auto; padding: 16px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; min-width: 0; }
+.field label { font-size: 13px; color: var(--text-muted); }
+.field input, .field textarea, .field select {
+  /* min-width:0 がないと、type="date"等のネイティブUIの最小幅により
+     flexアイテムとして縮みきれず、狭い画面で右にはみ出すことがある。 */
+  min-width: 0;
+  /* CSSの width:100% を指定していても、iOS Safariのネイティブ描画(特にtype="date")が
+     それを超えて描画されることがあるための最終的な安全策。 */
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+  /* 16px未満だとiOS Safariが入力欄フォーカス時に自動ズームするため、16px以上を確保する。
+     (input[type="date"]はネイティブピッカーが開くため対象外。下記で個別に上書きする) */
+  font-size: 16px;
+}
+
+.field input[type="date"] {
+  /* type="date"はiOSのネイティブ日付ピッカーとして描画され、フォーカスしてもテキスト
+     入力用の自動ズームは発生しないため、16px統一の対象外とする。ネイティブUIの描画幅を
+     抑えることで、カード幅の狭いiPhoneで右にはみ出す問題を軽減する。 */
+  font-size: 14px;
+  /* iOS Safariのtype="date"は、-webkit-appearanceの既定値(auto)のままだと、
+     ネイティブのウィジェット描画が width:100%/max-width:100% による幅指定を
+     無視して親要素の右端からはみ出すことがある(既知のOS側の挙動)。
+     appearanceをnoneにしてカスタム描画に切り替えることで、他の入力欄と同様に
+     CSSで指定した幅に確実に収まるようにする。日付選択機能自体は維持される
+     (フォーカス時にiOS標準の日付ピッカーが表示される点は変わらない)。 */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  min-height: 44px;
+  text-decoration: none;
+  cursor: pointer;
+  /* 幅が足りない場合にボタン内テキストが不自然に改行されるのを防ぐ。
+     ボタン単位で.btn-row/.filter-rowのflex-wrapにより次の行へ折り返す。 */
+  white-space: nowrap;
+}
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.filter-row input, .filter-row select {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* 明示的な幅がないとブラウザ既定の狭い幅になり、プレースホルダーが途中で切れる。
+     flex-basisを与えつつ、狭い画面ではmin-widthを保ったまま折り返す。 */
+  flex: 1 1 100px;
+  min-width: 90px;
+  max-width: 100%;
+  font-size: 16px; /* iOS Safariの自動ズーム防止 */
+}
+
+.warning-box {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-candidate {
+  background: var(--surface);
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.duplicate-candidate div + div { margin-top: 2px; color: var(--text-muted); font-size: 12px; }
+
+.btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+.error-text { color: var(--danger); font-size: 13px; overflow-wrap: anywhere; }
+
+.expense-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+.expense-row-main {
+  /* 長い支払先名でも行全体を押し広げず、この中だけで折り返す。 */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.expense-row-link {
+  /* 「証憑」リンクは幅を圧迫されて縦に折り返されないよう、常に必要幅を確保する。 */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* スマホ幅(480px以下)では、一覧画面のフィルター行を
+   「年・月を横並び」→「事業区分を単独行・100%幅」→「絞り込むボタンを単独行・100%幅」
+   の順に明示的に積む。事業区分の<select>が中途半端な残り幅しか得られず、
+   選択肢テキストが途中で切れる問題を防ぐため。 */
+@media (max-width: 480px) {
+  .filter-row input[type="number"] {
+    flex: 1 1 calc(50% - 4px);
+  }
+  .filter-row select {
+    flex: 1 1 100%;
+  }
+  .filter-row button {
+    flex: 1 1 100%;
+  }
+
+  /* 「新しい経費を登録」「CSVダウンロード」も、狭い画面では縦積み・100%幅にして
+     ボタン内テキストの不自然な改行や横方向の圧迫を避ける。 */
+  .btn-row .btn {
+    flex: 1 1 100%;
+  }
+}

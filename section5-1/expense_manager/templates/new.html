@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}経費を登録 - 経費管理{% endblock %}
+{% block body %}
+<main class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h1 style="font-size:18px">経費を登録</h1>
+    <a href="/" style="font-size:13px;color:var(--text-muted)">一覧に戻る</a>
+  </div>
+
+  <!-- ステップ1: アップロード -->
+  <section id="step-upload">
+    <div class="field">
+      <label>レシート・領収書を撮影/選択</label>
+      <input type="file" id="fileInput" accept="image/*,application/pdf" />
+    </div>
+    <img id="preview" style="display:none;max-width:200px;margin-bottom:12px" />
+    <button id="analyzeBtn" class="btn btn-primary" disabled>解析する</button>
+    <p id="analyzeError" class="error-text"></p>
+  </section>
+
+  <!-- ステップ2: 確認・修正 -->
+  <section id="step-confirm" style="display:none">
+    <div class="card">
+      <div class="field"><label>取引日</label><input type="date" id="f_transaction_date" /></div>
+      <div class="field"><label>支払先</label><input type="text" id="f_payee" /></div>
+      <div class="field"><label>金額(税込)</label><input type="number" id="f_amount" /></div>
+      <div class="field"><label>消費税額</label><input type="number" id="f_tax_amount" /></div>
+      <div class="field"><label>税率</label><input type="text" id="f_tax_rate" placeholder="例: 10%" /></div>
+      <div class="field"><label>10%対象額</label><input type="number" id="f_tax_rate_10_base" /></div>
+      <div class="field"><label>10%消費税額</label><input type="number" id="f_tax_rate_10_amount" /></div>
+      <div class="field"><label>8%対象額</label><input type="number" id="f_tax_rate_8_base" /></div>
+      <div class="field"><label>8%消費税額</label><input type="number" id="f_tax_rate_8_amount" /></div>
+      <div class="field"><label>インボイス登録番号</label><input type="text" id="f_invoice_registration_number" /></div>
+      <div class="field"><label>内容・品目</label><textarea id="f_description" rows="2"></textarea></div>
+      <div class="field">
+        <label>勘定科目</label>
+        <select id="f_account_category"></select>
+      </div>
+      <div class="field">
+        <label>事業区分</label>
+        <select id="f_business_segment"></select>
+      </div>
+      <div class="field"><label>摘要</label><input type="text" id="f_memo" /></div>
+      <div class="field"><label>支払方法</label><input type="text" id="f_payment_method" /></div>
+    </div>
+
+    <div id="duplicateWarning" class="warning-box" style="display:none"></div>
+
+    <button id="registerBtn" class="btn btn-primary">登録する</button>
+    <p id="registerError" class="error-text"></p>
+  </section>
+
+  <!-- ステップ3: 完了 -->
+  <section id="step-complete" style="display:none">
+    <div class="card">
+      <p>登録が完了しました。</p>
+      <p>管理番号: <strong id="completeManagementNumber"></strong></p>
+      <p><a id="completeDriveLink" href="#" target="_blank" rel="noreferrer">証憑画像を開く</a></p>
+    </div>
+    <a href="/" class="btn">一覧に戻る</a>
+    <button id="nextBtn" class="btn btn-primary">次の経費を登録</button>
+  </section>
+
+  <script src="/static/new.js"></script>
+</main>
+{% endblock %}

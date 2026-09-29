@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}ログイン - 経費管理{% endblock %}
+{% block body %}
+<main class="page" style="padding-top:64px">
+  <div class="card" style="text-align:center">
+    <h1 style="font-size:20px;margin-bottom:8px">経費管理</h1>
+    <p style="color:var(--text-muted);margin-bottom:20px">許可されたGoogleアカウントでログインしてください。</p>
+    <button id="signin" class="btn btn-primary">Googleでログイン</button>
+    <p id="error" class="error-text" style="margin-top:8px"></p>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: {{ firebase_config.apiKey|tojson }},
+    authDomain: {{ firebase_config.authDomain|tojson }},
+    projectId: {{ firebase_config.projectId|tojson }},
+    appId: {{ firebase_config.appId|tojson }},
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  const nextPath = {{ next_path|tojson }};
+  const errorEl = document.getElementById("error");
+
+  document.getElementById("signin").addEventListener("click", async () => {
+    errorEl.textContent = "";
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const result = await firebase.auth().signInWithPopup(provider);
+      const idToken = await result.user.getIdToken();
+
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        errorEl.textContent = body.error || "ログインに失敗しました";
+        await firebase.auth().signOut();
+        return;
+      }
+      window.location.href = nextPath || "/";
+    } catch (e) {
+      errorEl.textContent = e.message;
+    }
+  });
+</script>
+{% endblock %}

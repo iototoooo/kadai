@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+gspread
+google-auth
+google-api-python-client
+google-genai
+firebase-admin
+python-dotenv
+python-multipart
+jinja2
+tzdata

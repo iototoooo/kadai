@@ -1,0 +1,4 @@
+# このディレクトリの authorize_drive.py (一度だけ手動実行する認可ツール)専用の追加依存。
+# Cloud Runにデプロイする本体アプリ(../requirements.txt)には含めない
+# (対話的なブラウザ認可フローはローカル実行専用のため)。
+google-auth-oauthlib

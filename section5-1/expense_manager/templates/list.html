@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}経費一覧 - 経費管理{% endblock %}
+{% block body %}
+<main class="page">
+  <h1 style="font-size:18px;margin-bottom:12px">経費一覧</h1>
+
+  <div class="filter-row">
+    <input type="number" id="filterYear" placeholder="年(例: 2026)" />
+    <input type="number" id="filterMonth" placeholder="月(1-12)" min="1" max="12" />
+    <select id="filterSegment">
+      <option value="">事業区分(すべて)</option>
+    </select>
+    <button id="applyFilter" class="btn">絞り込む</button>
+  </div>
+
+  <div class="btn-row" style="margin-bottom:12px">
+    <a href="/new" class="btn btn-primary">新しい経費を登録</a>
+    <button id="downloadCsv" class="btn">CSVダウンロード</button>
+  </div>
+
+  <p id="status" style="color:var(--text-muted)">読み込み中...</p>
+  <div id="list"></div>
+
+  <script src="/static/list.js"></script>
+</main>
+{% endblock %}

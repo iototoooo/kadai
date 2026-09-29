@@ -7,6 +7,8 @@ token_gmail.json
 token_youtube_upload.json
 token_meet_minutes.json
 credentials.json
+client_secret.json
+drive_oauth_result.json
 .env
 mercari_storage_state.json
 
