@@ -1,0 +1,7 @@
+# gcloud run deploy --source でアップロードしないファイル。
+.gcloudignore
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/

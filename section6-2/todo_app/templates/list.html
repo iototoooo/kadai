@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="topbar">
+  <h1>Todoリスト</h1>
+  <button id="logout" class="btn btn-text" type="button">ログアウト</button>
+</header>
+<main class="page">
+  <a href="/todos/new" class="btn btn-primary btn-block">＋ 新しいTodo</a>
+  <p id="status" class="muted center" role="status">読み込み中…</p>
+  <ul id="todo-list" class="todo-list"></ul>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/list.js"></script>
+{% endblock %}

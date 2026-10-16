@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ "Todoの編集" if todo_id else "新しいTodo" }} - Todoリスト{% endblock %}
+{% block body %}
+<header class="topbar">
+  <a href="/" class="btn btn-text">← 一覧</a>
+  <h1>{{ "Todoの編集" if todo_id else "新しいTodo" }}</h1>
+  <span class="topbar-spacer"></span>
+</header>
+<main class="page">
+  <form id="todo-form" class="card" data-todo-id="{{ todo_id }}" novalidate>
+    <label for="title">タイトル <span class="required">必須</span></label>
+    <input id="title" name="title" type="text" maxlength="100" required autocomplete="off">
+
+    <label for="content">内容</label>
+    <textarea id="content" name="content" rows="6" maxlength="2000"></textarea>
+
+    <label for="due_date">期日</label>
+    <input id="due_date" name="due_date" type="date">
+
+    <p id="meta" class="muted small"></p>
+    <p id="error" class="error-text" role="alert"></p>
+
+    <div class="actions">
+      <a href="/" class="btn btn-secondary">キャンセル</a>
+      <button id="save" type="submit" class="btn btn-primary">保存</button>
+    </div>
+  </form>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/form.js"></script>
+{% endblock %}
