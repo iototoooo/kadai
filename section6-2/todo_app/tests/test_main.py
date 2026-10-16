@@ -34,6 +34,7 @@ def ws():
 @pytest.fixture
 def client(monkeypatch, ws):
     monkeypatch.setattr(config, "ALLOWED_LOGIN_EMAIL", ALLOWED)
+    monkeypatch.setattr(config, "TODO_SPREADSHEET_ID", "")  # テストから本物のシートに接続しない
     monkeypatch.setattr(auth, "verify_session_cookie", _fake_verify_session_cookie)
     service = TodoService(sheets=FakeSheetsClient(ws), now=FakeClock(), new_id=SequentialIds())
     main.app.dependency_overrides[main.get_service] = lambda: service
@@ -241,3 +242,40 @@ def test_security_headers(client):
     assert res.headers["X-Frame-Options"] == "DENY"
     assert res.headers["X-Content-Type-Options"] == "nosniff"
     assert res.headers["Cache-Control"] == "no-store"
+
+
+# --- 起動時のシート接続チェック ---
+
+
+def test_startup_check_skipped_without_spreadsheet_id(monkeypatch):
+    monkeypatch.setattr(config, "TODO_SPREADSHEET_ID", "")
+    monkeypatch.setattr(main, "get_service", lambda: pytest.fail("接続してはいけない"))
+    assert main.startup_sheets_check() is False
+
+
+def test_startup_check_writes_header_on_empty_sheet(monkeypatch):
+    from todo_app import sheets_client
+
+    ws = FakeWorksheet(header=[])
+
+    class LazySheets:
+        @property
+        def worksheet(self):
+            sheets_client.ensure_header(ws)
+            return ws
+
+    monkeypatch.setattr(config, "TODO_SPREADSHEET_ID", "dummy-id")
+    monkeypatch.setattr(main, "get_service", lambda: TodoService(sheets=LazySheets()))
+    assert main.startup_sheets_check() is True
+    assert ws.rows[0] == sheets_client.HEADER_ROW
+
+
+def test_startup_check_failure_does_not_raise(monkeypatch):
+    class BrokenSheets:
+        @property
+        def worksheet(self):
+            raise PermissionError("403 caller does not have permission")
+
+    monkeypatch.setattr(config, "TODO_SPREADSHEET_ID", "dummy-id")
+    monkeypatch.setattr(main, "get_service", lambda: TodoService(sheets=BrokenSheets()))
+    assert main.startup_sheets_check() is False

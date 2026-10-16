@@ -51,6 +51,10 @@ class TodoService:
     def _ws(self):
         return self._sheets.worksheet
 
+    def check_connection(self) -> None:
+        """シートを開き、ヘッダー確認(空なら書き込み)まで行う。失敗時は例外を送出する。"""
+        _ = self._ws
+
     def _data_rows(self) -> list[list]:
         return self._ws.get_all_values()[1:]  # 1行目はヘッダー
 

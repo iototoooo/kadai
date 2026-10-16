@@ -7,8 +7,10 @@ API : /api/session, /api/session/logout, /api/todos, /api/todos/{id}
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Request
@@ -33,10 +35,6 @@ if not logger.handlers:
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = FastAPI(title="Todoリスト", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
 TODO_ID_PATTERN = r"^[0-9a-f]{32}$"
 GENERIC_ERROR = "処理に失敗しました。時間をおいて再度お試しください。"
 
@@ -48,6 +46,36 @@ def get_service() -> TodoService:
     if _service is None:
         _service = TodoService()
     return _service
+
+
+def startup_sheets_check() -> bool:
+    """起動時にシートへ接続し、ヘッダー確認(空なら書き込み)まで行って結果をログに残す。
+
+    失敗しても起動自体は止めない(ログで原因を確認できるようにするための自己診断)。
+    """
+    if not config.TODO_SPREADSHEET_ID:
+        logger.warning("startup sheets check skipped: TODO_SPREADSHEET_ID is not set")
+        return False
+    try:
+        get_service().check_connection()
+    except Exception as e:  # noqa: BLE001
+        logger.error("startup sheets check failed: %s: %s", type(e).__name__, str(e)[:300])
+        return False
+    logger.info("startup sheets check OK (sheet=%s)", config.TODO_SHEET_NAME)
+    return True
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    await asyncio.to_thread(startup_sheets_check)
+    yield
+
+
+app = FastAPI(
+    title="Todoリスト", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan
+)
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
 # --- 共通: セキュリティヘッダー・エラー処理 ---
