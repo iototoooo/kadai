@@ -93,3 +93,14 @@ gcloud run deploy todo-app \
   (Firebaseセッションcookie + 許可アカウント照合)で行う。
 - デプロイ後、Firebase Authenticationの承認済みドメインに
   `todo-app-221708489717.asia-northeast1.run.app` を追加する(既存ドメインは残したまま追加のみ)。
+
+## 課題2で追加した本番構成
+| リソース | 内容 |
+|---|---|
+| Secret Manager `todo-app-line` | `{"channel_access_token","to"}` のJSON。`todo-app-run` のみ読み取り可。登録は `scripts/register_line_secret.py`(値を表示せず、読み戻して一致確認) |
+| Cloud Run 環境変数 | `TODO_LINE_CONFIG`(上記Secret参照), `NOTIFY_AUDIENCE`, `NOTIFIER_SERVICE_ACCOUNT`, `APP_BASE_URL` |
+| SA `todo-notifier` | 権限なし。Schedulerが `/internal/notify` 呼び出し時のOIDCトークン発行に使うだけ |
+| Cloud Scheduler `todo-app-notify` | `0 * * * *`(Asia/Tokyo)、POST `/internal/notify`、OIDC(audience=上記URL)、再試行1回 |
+
+再デプロイ時は既存設定を引き継ぐため `--update-env-vars` / `--update-secrets` を使う(`--set-*` は既存設定を消す)。
+旧版(A〜F列のみを書き込む)へ切り戻しても、G〜K列のデータは消えない。
