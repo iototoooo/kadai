@@ -13,6 +13,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
+from .line_client import LineSendError
 from .models import NotificationSettings, Todo
 from .todo_service import NotifyKind, TodoService, sort_todos
 
@@ -82,33 +83,55 @@ def _previous_mark(item: NotificationItem) -> str:
 def run_notifications(service: TodoService, line_client, now: datetime.datetime, app_url: str = "") -> dict:
     """通知を1回分実行する。
 
-    順序は「送信済み記録 → 送信」。記録できなかったものは送らないため、記録漏れによる重複は起きない。
-    送信が失敗した場合は同じretry keyで1回だけ再試行し(LINE側で重複配信されない)、
-    それでも失敗したら記録を元に戻して例外を送出する(次回の定期実行で再試行される)。
+    1. 送信済み記録を先に書く。途中で記録に失敗したら、書いた分を元に戻して送信しない。
+    2. 送信。失敗したら同じretry keyで1回だけ再試行する(1回目が実は届いていてもLINE側で409になり二重配信されない)。
+    3. 最終的に失敗した場合:
+       - どの試行もLINEが明確にエラー応答(LineSendError)を返した → 未配信が確実なので記録を戻す(次回再送)。
+       - タイムアウト等で配信されたか不明な試行があった → 重複を避けるため記録は残す(再送しない)。
     """
     settings = service.get_settings()
     items = select_notifications(service.all_todos(), settings, now)
     if not items:
         return {"sent": 0}
 
-    for item in items:
-        service.mark_notified(item.todo.id, item.kind, item.todo.due_date)
+    marked: list[NotificationItem] = []
+    try:
+        for item in items:
+            service.mark_notified(item.todo.id, item.kind, item.todo.due_date)
+            marked.append(item)
+    except Exception:
+        _rollback_marks(service, marked)
+        raise
 
     message = build_message(items, app_url)
     retry_key = retry_key_for(items)
-    try:
+    delivery_unknown = False
+    last_error: Exception | None = None
+    for attempt in (1, 2):
         try:
             result = line_client.push_text(message, retry_key)
-        except Exception:  # noqa: BLE001
-            logger.warning("LINE push failed once; retrying with the same retry key")
-            result = line_client.push_text(message, retry_key)
-    except Exception:
-        for item in items:
-            try:
-                service.mark_notified(item.todo.id, item.kind, _previous_mark(item))
-            except Exception:  # noqa: BLE001
-                logger.exception("failed to roll back notification mark")
-        raise
+            break
+        except LineSendError as e:
+            last_error = e
+            logger.warning("LINE push rejected (attempt %d, status=%s)", attempt, e.status_code)
+        except Exception as e:  # noqa: BLE001  タイムアウト・接続断など、配信されたか不明
+            last_error = e
+            delivery_unknown = True
+            logger.warning("LINE push outcome unknown (attempt %d): %s", attempt, type(e).__name__)
+    else:
+        if delivery_unknown:
+            logger.error("LINE delivery unknown; keeping marks to avoid duplicate notifications")
+        else:
+            _rollback_marks(service, items)
+        raise last_error
 
     logger.info("notification %s: %d item(s)", result, len(items))
     return {"sent": len(items), "result": result}
+
+
+def _rollback_marks(service: TodoService, items: list[NotificationItem]) -> None:
+    for item in items:
+        try:
+            service.mark_notified(item.todo.id, item.kind, _previous_mark(item))
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to roll back notification mark")

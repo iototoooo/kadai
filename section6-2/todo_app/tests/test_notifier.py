@@ -248,3 +248,79 @@ def test_load_line_config(monkeypatch, raw, ok):
 
     monkeypatch.setattr(config, "TODO_LINE_CONFIG", raw)
     assert line_client.is_configured() is ok
+
+
+# --- 失敗パターンごとの記録の扱い(重複防止の最終確認) ---
+
+
+def test_partial_mark_failure_rolls_back_and_sends_nothing(service, line, monkeypatch):
+    a = service.create_todo(TodoInput(title="A", due_date=TODAY_S))
+    b = service.create_todo(TodoInput(title="B", due_date=TODAY_S))
+    original = service.mark_notified
+    calls = {"n": 0}
+
+    def flaky(todo_id, kind, due):
+        calls["n"] += 1
+        if calls["n"] == 2:  # 2件目の記録で失敗
+            raise RuntimeError("sheets down")
+        return original(todo_id, kind, due)
+
+    monkeypatch.setattr(service, "mark_notified", flaky)
+    with pytest.raises(RuntimeError):
+        notifier.run_notifications(service, line, at(9))
+    assert line.attempts == 0
+    monkeypatch.setattr(service, "mark_notified", original)
+    # 1件目の記録も元に戻っているので、次回は2件とも送られる(取りこぼしなし)
+    assert service.get_todo(a.id).notified_same_day_due == ""
+    assert service.get_todo(b.id).notified_same_day_due == ""
+    notifier.run_notifications(service, line, at(10))
+    assert len(line.sent) == 1 and "A" in line.sent[0][0] and "B" in line.sent[0][0]
+
+
+def test_unknown_delivery_keeps_marks_to_avoid_duplicates(service, line):
+    import requests
+
+    t = service.create_todo(TodoInput(title="今日", due_date=TODAY_S))
+    line.fail_times = 2
+    line.fail_with = requests.Timeout("read timeout")
+    with pytest.raises(requests.Timeout):
+        notifier.run_notifications(service, line, at(9))
+    assert service.get_todo(t.id).notified_same_day_due == TODAY_S  # 記録は残す
+    service.create_todo(TodoInput(title="別件", due_date=TODAY_S))
+    notifier.run_notifications(service, line, at(10))
+    # 次回は「別件」だけが送られ、「今日」は再送されない
+    assert len(line.sent) == 1 and "別件" in line.sent[0][0] and "・[中] 今日" not in line.sent[0][0]
+
+
+def test_timeout_then_rejection_still_counts_as_unknown(service, line):
+    import requests
+
+    t = service.create_todo(TodoInput(title="今日", due_date=TODAY_S))
+
+    class Seq:
+        attempts = 0
+
+        def push_text(self, text, key):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise requests.ConnectionError("reset")
+            raise line_client.LineSendError(500)
+
+    with pytest.raises(line_client.LineSendError):
+        notifier.run_notifications(service, Seq(), at(9))
+    assert service.get_todo(t.id).notified_same_day_due == TODAY_S
+
+
+def test_retry_uses_identical_key_and_message(service):
+    service.create_todo(TodoInput(title="今日", due_date=TODAY_S))
+    seen = []
+
+    class Rec:
+        def push_text(self, text, key):
+            seen.append((text, key))
+            if len(seen) == 1:
+                raise line_client.LineSendError(503)
+            return "duplicate"  # 1回目が実は受理されていたケース
+
+    notifier.run_notifications(service, Rec(), at(9))
+    assert len(seen) == 2 and seen[0] == seen[1]
