@@ -254,20 +254,33 @@ def test_startup_check_skipped_without_spreadsheet_id(monkeypatch):
 
 
 def test_startup_check_writes_header_on_empty_sheet(monkeypatch):
+    import datetime
+
     from todo_app import sheets_client
+    from todo_app.tests.fakes import FakeSpreadsheet
 
     ws = FakeWorksheet(header=[])
+    spreadsheet = FakeSpreadsheet(ws)
 
     class LazySheets:
+        last_migration_result = ""
+
         @property
         def worksheet(self):
-            sheets_client.ensure_header(ws)
+            self.last_migration_result = sheets_client.migrate_todo_sheet(
+                spreadsheet, ws, datetime.datetime(2026, 10, 17)
+            )
             return ws
+
+        @property
+        def settings_worksheet(self):
+            return sheets_client.ensure_settings_sheet(spreadsheet)
 
     monkeypatch.setattr(config, "TODO_SPREADSHEET_ID", "dummy-id")
     monkeypatch.setattr(main, "get_service", lambda: TodoService(sheets=LazySheets()))
     assert main.startup_sheets_check() is True
     assert ws.rows[0] == sheets_client.HEADER_ROW
+    assert "設定" in spreadsheet.sheets
 
 
 def test_startup_check_failure_does_not_raise(monkeypatch):

@@ -31,3 +31,19 @@ TODO_SPREADSHEET_ID = os.getenv("TODO_SPREADSHEET_ID", "")
 TODO_SHEET_NAME = os.getenv("TODO_SHEET_NAME", "Todo")
 
 TIMEZONE_NAME = "Asia/Tokyo"
+SETTINGS_SHEET_NAME = os.getenv("TODO_SETTINGS_SHEET_NAME", "設定")
+
+# --- LINE期限通知 ---
+# Secret Manager の todo-app-line をCloud Runで環境変数として参照する。
+# 中身はJSON: {"channel_access_token": "...", "to": "U..."}。値はログ・画面に出さない。
+TODO_LINE_CONFIG = os.getenv("TODO_LINE_CONFIG", "")
+
+# Cloud Scheduler → POST /internal/notify の呼び出し元検証(OIDC IDトークン)。
+# NOTIFY_AUDIENCE: Schedulerジョブに設定したaudience(例: https://<サービスURL>/internal/notify)
+# NOTIFIER_SERVICE_ACCOUNT: Schedulerジョブがトークンを発行するSA(todo-notifier)
+# どちらかが未設定なら /internal/notify は常に拒否する。
+NOTIFY_AUDIENCE = os.getenv("NOTIFY_AUDIENCE", "")
+NOTIFIER_SERVICE_ACCOUNT = os.getenv("NOTIFIER_SERVICE_ACCOUNT", "")
+
+# 通知メッセージ末尾に載せるアプリのURL(任意。空なら載せない)。
+APP_BASE_URL = os.getenv("APP_BASE_URL", "")

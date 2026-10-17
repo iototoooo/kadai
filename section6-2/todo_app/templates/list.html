@@ -2,10 +2,29 @@
 {% block body %}
 <header class="topbar">
   <h1>Todoリスト</h1>
-  <button id="logout" class="btn btn-text" type="button">ログアウト</button>
+  <nav class="topbar-actions">
+    <a href="/settings" class="btn btn-text">通知設定</a>
+    <button id="logout" class="btn btn-text" type="button">ログアウト</button>
+  </nav>
 </header>
 <main class="page">
   <a href="/todos/new" class="btn btn-primary btn-block">＋ 新しいTodo</a>
+
+  <div class="toolbar">
+    <div class="segmented" role="radiogroup" aria-label="表示するTodo" id="status-filter">
+      <button type="button" role="radio" data-status="open">未完了</button>
+      <button type="button" role="radio" data-status="done">完了</button>
+      <button type="button" role="radio" data-status="all">すべて</button>
+    </div>
+    <label class="sort-label">
+      <span class="visually-hidden">並び順</span>
+      <select id="sort">
+        <option value="due">期日順</option>
+        <option value="importance">重要度順</option>
+      </select>
+    </label>
+  </div>
+
   <p id="status" class="muted center" role="status">読み込み中…</p>
   <ul id="todo-list" class="todo-list"></ul>
 </main>

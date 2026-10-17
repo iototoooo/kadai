@@ -11,6 +11,10 @@
     due_date: document.getElementById("due_date"),
   };
 
+  function setImportance(value) {
+    for (const radio of form.elements.importance) radio.checked = radio.value === value;
+  }
+
   if (todoId) {
     saveButton.disabled = true;
     try {
@@ -18,6 +22,7 @@
       fields.title.value = todo.title;
       fields.content.value = todo.content;
       fields.due_date.value = todo.due_date;
+      setImportance(todo.importance);
       metaEl.textContent = `登録 ${todo.created_at} ／ 更新 ${todo.updated_at}`;
       saveButton.disabled = false;
     } catch (e) {
@@ -35,6 +40,7 @@
       title: fields.title.value.trim(),
       content: fields.content.value,
       due_date: fields.due_date.value,
+      importance: form.elements.importance.value || "中",
     };
     if (!payload.title) {
       errorEl.textContent = "タイトルを入力してください";

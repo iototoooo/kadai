@@ -17,6 +17,15 @@
     <label for="due_date">期日</label>
     <input id="due_date" name="due_date" type="date">
 
+    <fieldset class="importance-field">
+      <legend>重要度</legend>
+      <div class="segmented segmented-radio">
+        <label><input type="radio" name="importance" value="高"><span>高</span></label>
+        <label><input type="radio" name="importance" value="中" checked><span>中</span></label>
+        <label><input type="radio" name="importance" value="低"><span>低</span></label>
+      </div>
+    </fieldset>
+
     <p id="meta" class="muted small"></p>
     <p id="error" class="error-text" role="alert"></p>
 

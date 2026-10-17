@@ -124,3 +124,71 @@ input:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset:
   -webkit-box-orient: vertical;
   word-break: break-word;
 }
+
+/* --- 課題2: 重要度・完了・絞り込み・通知設定 --- */
+:root {
+  --imp-high: #c62828;
+  --imp-high-bg: #fdecea;
+  --imp-mid: #9a6700;
+  --imp-mid-bg: #fff4d6;
+  --imp-low: #57606a;
+  --imp-low-bg: #eef1f4;
+  --ok: #1a7f37;
+}
+
+.topbar-actions { display: flex; gap: 4px; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+.ok-text { color: var(--ok); margin: 8px 0 0; }
+
+.toolbar { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+.toolbar .segmented { flex: 1; }
+.sort-label select, .setting-row select {
+  min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text); font: inherit;
+}
+
+.segmented {
+  display: flex; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); padding: 3px; gap: 3px;
+}
+.segmented > button, .segmented-radio > label {
+  flex: 1; min-height: 38px; display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 7px; background: none; color: var(--text); font: inherit;
+  font-weight: 600; cursor: pointer; margin: 0;
+}
+.segmented > button[aria-checked="true"] { background: var(--primary); color: var(--primary-text); }
+.segmented-radio > label { position: relative; }
+.segmented-radio input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segmented-radio label:has(input:checked) { background: var(--primary); color: var(--primary-text); }
+.segmented-radio label:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.importance-field { border: 0; padding: 0; margin: 16px 0 0; }
+.importance-field legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+
+.todo-item { display: flex; align-items: stretch; gap: 8px; }
+.todo-item .todo-card { flex: 1; min-width: 0; }
+.todo-check {
+  flex: none; width: 28px; height: 28px; margin: 14px 4px 0 6px;
+  accent-color: var(--primary); cursor: pointer;
+}
+.todo-head { display: flex; gap: 8px; align-items: baseline; }
+.imp-badge {
+  flex: none; font-size: 12px; font-weight: 700; line-height: 1; padding: 4px 7px; border-radius: 999px;
+}
+.imp-high { color: var(--imp-high); background: var(--imp-high-bg); }
+.imp-mid { color: var(--imp-mid); background: var(--imp-mid-bg); }
+.imp-low { color: var(--imp-low); background: var(--imp-low-bg); }
+.todo-item.is-done .todo-card { opacity: 0.6; }
+.todo-item.is-done .todo-title { text-decoration: line-through; }
+
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.setting-row select:disabled { opacity: 0.5; }
+.switch { display: flex; align-items: center; gap: 10px; margin: 0; font-weight: 600; cursor: pointer; }
+.switch input { width: 24px; height: 24px; accent-color: var(--primary); }
+form .setting-row label { margin: 0; }

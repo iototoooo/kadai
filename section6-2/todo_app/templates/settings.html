@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}通知設定 - Todoリスト{% endblock %}
+{% block body %}
+<header class="topbar">
+  <a href="/" class="btn btn-text">← 一覧</a>
+  <h1>通知設定</h1>
+  <span class="topbar-spacer"></span>
+</header>
+<main class="page">
+  <form id="settings-form" class="card" novalidate>
+    <p class="muted small">未完了で期日のあるTodoを、LINEでお知らせします。完了したTodoには通知しません。</p>
+
+    <div class="setting-row">
+      <label class="switch">
+        <input id="day_before_enabled" type="checkbox">
+        <span>前日に通知する</span>
+      </label>
+      <select id="day_before_hour" aria-label="前日通知の時刻"></select>
+    </div>
+
+    <div class="setting-row">
+      <label class="switch">
+        <input id="same_day_enabled" type="checkbox">
+        <span>当日に通知する</span>
+      </label>
+      <select id="same_day_hour" aria-label="当日通知の時刻"></select>
+    </div>
+
+    <p class="muted small">通知は毎時0分に確認します。設定した時刻を過ぎていて、まだ通知していないTodoがあれば送ります。同じTodoへの同じ種類の通知は1回だけです(期日を変更した場合は新しい期日で再度通知します)。</p>
+
+    <p id="line-status" class="small"></p>
+    <p id="error" class="error-text" role="alert"></p>
+    <p id="message" class="ok-text" role="status"></p>
+
+    <div class="actions">
+      <button id="test" type="button" class="btn btn-secondary">テスト通知</button>
+      <button id="save" type="submit" class="btn btn-primary">保存</button>
+    </div>
+  </form>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/settings.js"></script>
+{% endblock %}
