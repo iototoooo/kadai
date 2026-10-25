@@ -1,8 +1,10 @@
 import mimetypes
 import os
+from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -30,24 +32,53 @@ CATEGORY_ID = "22"  # People & Blogs
 # アップロード対象の動画フォルダ（固定）。実行のたびにこの中の動画すべてが対象になる。
 FOLDER_PATH = r"C:\Users\iotot\OneDrive\デスクトップ\サッカー動画アップロード"
 
-# アップロード先として想定しているチャンネルのハンドル。認証したアカウントのチャンネルが
-# これと異なる場合は誤ったアカウントとみなして自動的に中止する。
-EXPECTED_CHANNEL_HANDLE = "@NSC2024-lj7fk"
+# アップロード先として想定しているチャンネル（NSC2024 ブランドアカウント）のID。
+# 認証したアカウントのチャンネルIDがこれと異なる場合は誤ったアカウントとみなして自動的に中止する。
+EXPECTED_CHANNEL_ID = "UCUIyWixjqEWTqktDEFRTghA"
+EXPECTED_CHANNEL_NAME = "NSC2024"
 
 load_dotenv()
+
+
+def backup_token_file(reason: str) -> str | None:
+    """token ファイルを別名に退避する（中身は表示しない）。退避先のパスを返す。"""
+    if not os.path.exists(TOKEN_FILE):
+        return None
+    backup_path = f"{TOKEN_FILE}.bak_{datetime.now():%Y%m%d_%H%M%S}_{reason}"
+    os.replace(TOKEN_FILE, backup_path)
+    return backup_path
+
+
+def run_oauth_flow() -> Credentials:
+    print("\nブラウザでGoogleの認証画面を開きます。")
+    print(f"アカウント選択画面では、ブランドアカウント「{EXPECTED_CHANNEL_NAME}」を選択してください。")
+    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+    # select_account でブランドアカウントの選択画面を必ず表示し、consent でリフレッシュトークンを確実に再発行させる
+    return flow.run_local_server(port=0, prompt="select_account consent", access_type="offline")
 
 
 def get_youtube_service():
     creds = None
     if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        except ValueError:
+            backup_path = backup_token_file("broken")
+            print(f"保存済みトークンを読み込めなかったため退避しました: {backup_path}")
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError as e:
+                # invalid_grant など。エラー内容にトークンは含まれないが、念のため種別のみ表示する
+                error_code = e.args[1].get("error") if len(e.args) > 1 and isinstance(e.args[1], dict) else None
+                print(f"\n保存済みトークンを更新できませんでした（{error_code or type(e).__name__}）。再認証します。")
+                backup_path = backup_token_file("expired")
+                print(f"失効したトークンを退避しました: {backup_path}")
+                creds = run_oauth_flow()
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = run_oauth_flow()
         with open(TOKEN_FILE, "w", encoding="utf-8") as token:
             token.write(creds.to_json())
 
@@ -105,7 +136,7 @@ def get_current_channel_info(youtube) -> dict | None:
     if not items:
         return None
     snippet = items[0]["snippet"]
-    return {"title": snippet.get("title"), "handle": snippet.get("customUrl")}
+    return {"id": items[0]["id"], "title": snippet.get("title"), "handle": snippet.get("customUrl")}
 
 
 def list_my_playlists(youtube) -> list[dict]:
@@ -192,13 +223,18 @@ def main():
         print("認証したアカウントに紐づくチャンネルが見つかりませんでした。")
         return
 
-    print(f"\nアップロード先チャンネル: {channel_info['title']} ({channel_info['handle']})")
+    print(f"\nアップロード先チャンネル: {channel_info['title']} ({channel_info['handle']}) ID: {channel_info['id']}")
 
-    if (channel_info["handle"] or "").lower() != EXPECTED_CHANNEL_HANDLE.lower():
-        print(
-            f"想定しているチャンネル（{EXPECTED_CHANNEL_HANDLE}）と異なります。"
-            f"認証しているGoogleアカウントを確認するか、{TOKEN_FILE} を削除して正しいアカウントで再認証してください。"
-        )
+    if channel_info["id"] != EXPECTED_CHANNEL_ID:
+        # 誤ったチャンネルのトークンを残すと次回も同じチャンネルで認証されるため退避しておく
+        backup_path = backup_token_file("wrong_channel")
+        print("\n" + "!" * 60)
+        print("【中止】想定と異なるYouTubeチャンネルで認証されています。アップロードは行いません。")
+        print(f"  想定: {EXPECTED_CHANNEL_NAME} (ID: {EXPECTED_CHANNEL_ID})")
+        print(f"  実際: {channel_info['title']} (ID: {channel_info['id']})")
+        print(f"  このチャンネルのトークンは退避しました: {backup_path}")
+        print(f"  もう一度実行し、認証画面でブランドアカウント「{EXPECTED_CHANNEL_NAME}」を選択してください。")
+        print("!" * 60)
         return
 
     playlist_id = choose_playlist(youtube)
